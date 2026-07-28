@@ -1,0 +1,69 @@
+name: 构建APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+
+      - name: 设置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 接受许可证
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: 安装构建工具
+        run: |
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1 || true
+
+      - name: 赋予 Gradlew 执行权限
+        run: chmod +x gradlew || true
+
+      - name: 创建 gradlew
+        run: |
+          if [ ! -f gradlew ]; then
+            cat > gradlew << 'GRADLE'
+#!/bin/sh
+APP_HOME=$(cd $(dirname $0) && pwd)
+cd "$APP_HOME"
+if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+  echo "Downloading Gradle..."
+  mkdir -p gradle/wrapper
+  curl -sL "https://github.com/gradle/gradle/raw/v8.2.0/gradle/wrapper/gradle-wrapper.jar" -o gradle/wrapper/gradle-wrapper.jar 2>/dev/null
+  cat > gradle/wrapper/gradle-wrapper.properties << 'PROPS'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+PROPS
+fi
+JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/temurin-17-jdk}
+"$JAVA_HOME/bin/java" -Dorg.gradle.appname=gradlew -cp "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
+GRADLE
+            chmod +x gradlew
+          fi
+
+      - name: 构建 Debug APK
+        run: ./gradlew assembleDebug
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME || '/usr/local/lib/android/sdk' }}
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoAnswerApp-Debug
+          path: app/build/outputs/apk/debug/*.apk

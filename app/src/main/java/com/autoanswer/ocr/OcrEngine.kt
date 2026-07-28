@@ -1,0 +1,71 @@
+package com.autoanswer.ocr
+
+import android.graphics.Bitmap
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+
+class OcrEngine {
+
+    private val recognizer = TextRecognition.getClient(
+        ChineseTextRecognizerOptions.Builder().build()
+    )
+
+    data class OcrResult(
+        val text: String,
+        val confidence: Float = 0f,
+        val blocks: List<TextBlock> = emptyList()
+    )
+
+    data class TextBlock(
+        val text: String,
+        val left: Float, val top: Float,
+        val right: Float, val bottom: Float
+    )
+
+    /** 识别图片中的文字 */
+    suspend fun recognize(bitmap: Bitmap): OcrResult {
+        return try {
+            val image = InputImage.fromBitmap(bitmap, 0)
+            val result = recognizer.process(image)
+            // 同步转协程
+            val text = result.text
+            val blocks = result.textBlocks.map { block ->
+                val box = block.boundingBox ?: return@map null
+                TextBlock(
+                    text = block.text,
+                    left = box.left.toFloat(),
+                    top = box.top.toFloat(),
+                    right = box.right.toFloat(),
+                    bottom = box.bottom.toFloat()
+                )
+            }.filterNotNull()
+
+            OcrResult(text = text, blocks = blocks)
+        } catch (e: Exception) {
+            OcrResult(text = "", blocks = emptyList())
+        }
+    }
+
+    /** 提取题目文本（智能过滤非题目内容） */
+    fun extractQuestions(ocrResult: OcrResult): List<String> {
+        val lines = ocrResult.text.split("\n")
+            .map { it.trim() }
+            .filter { it.isNotBlank() && it.length > 3 }
+            .filterNot { it.matches(Regex("^[A-E][.、．]?\\s*$")) } // 纯选项字母
+        return lines
+    }
+
+    /** 提取选项列表 */
+    fun extractOptions(ocrResult: OcrResult): Map<String, String> {
+        val options = mutableMapOf<String, String>()
+        val regex = Regex("""^([A-E])[.、．]?\s*(.+)$""")
+        ocrResult.text.split("\n").forEach { line ->
+            val match = regex.find(line.trim())
+            if (match != null) {
+                options[match.groupValues[1]] = match.groupValues[2].trim()
+            }
+        }
+        return options
+    }
+}
