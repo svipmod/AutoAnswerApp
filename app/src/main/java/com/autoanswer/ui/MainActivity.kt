@@ -1,10 +1,11 @@
 package com.autoanswer.ui
 
+import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,31 +14,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.autoanswer.AutoAnswerApp
 import com.autoanswer.capture.ScreenCaptureService
-import com.autoanswer.security.SecurityMonitorService
 import com.autoanswer.ui.screens.*
 import com.autoanswer.ui.theme.AutoAnswerTheme
 
 class MainActivity : ComponentActivity() {
-
-    private var screenCaptureResultCode by mutableIntStateOf(-1)
-    private var screenCaptureData: Intent? = null
-
-    private val mediaProjectionLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK && result.data != null) {
-            screenCaptureResultCode = result.resultCode
-            screenCaptureData = result.data
-            ScreenCaptureService.start(this, result.resultCode, result.data!!)
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -46,28 +30,37 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainApp(
-                        onRequestCapturePermission = { requestCapturePermission() },
-                        capturePermissionGranted = screenCaptureResultCode != -1
-                    )
+                    MainApp()
                 }
             }
         }
     }
-
-    private fun requestCapturePermission() {
-        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        val intent = manager.createScreenCaptureIntent()
-        mediaProjectionLauncher.launch(intent)
-    }
 }
 
 @Composable
-fun MainApp(
-    onRequestCapturePermission: () -> Unit = {},
-    capturePermissionGranted: Boolean = false
-) {
+fun MainApp() {
     val navController = rememberNavController()
+    var captureGranted by remember { mutableStateOf(false) }
+    val activity = LocalActivity.current
+
+    val captureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == ComponentActivity.RESULT_OK && result.data != null) {
+            captureGranted = true
+            activity?.let { act ->
+                ScreenCaptureService.start(act, result.resultCode, result.data!!)
+            }
+        }
+    }
+
+    fun requestScreenCapture() {
+        val manager = activity?.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+        if (manager != null) {
+            val intent = manager.createScreenCaptureIntent()
+            captureLauncher.launch(intent)
+        }
+    }
 
     NavHost(navController = navController, startDestination = "home") {
         composable("home") {
@@ -75,20 +68,18 @@ fun MainApp(
                 onNavigateToSettings = { navController.navigate("settings") },
                 onNavigateToAnswer = { navController.navigate("answer") },
                 onNavigateToLogs = { navController.navigate("logs") },
-                capturePermissionGranted = capturePermissionGranted,
-                onRequestCapturePermission = onRequestCapturePermission
+                capturePermissionGranted = captureGranted,
+                onRequestCapturePermission = { requestScreenCapture() }
             )
         }
         composable("settings") {
-            SettingsScreen(
-                onBack = { navController.popBackStack() }
-            )
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
         composable("answer") {
             AnswerScreen(
                 onBack = { navController.popBackStack() },
-                capturePermissionGranted = capturePermissionGranted,
-                onRequestCapturePermission = onRequestCapturePermission
+                capturePermissionGranted = captureGranted,
+                onRequestCapturePermission = { requestScreenCapture() }
             )
         }
         composable("logs") {
