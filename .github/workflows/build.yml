@@ -8,27 +8,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup JDK
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: temurin
-      - name: Install SDK
-        run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1 || true
       - name: Build
         run: |
-          mkdir -p gradle/wrapper
-          curl -sL "https://github.com/gradle/gradle/raw/v8.2.0/gradle/wrapper/gradle-wrapper.jar" -o gradle/wrapper/gradle-wrapper.jar
-          echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
-          echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
-          echo "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.2-bin.zip" >> gradle/wrapper/gradle-wrapper.properties
-          echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
-          echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
-          echo '#!/bin/sh' > gradlew
-          echo 'JAVA_HOME=${JAVA_HOME:-/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64}' >> gradlew
-          echo 'exec "$JAVA_HOME/bin/java" -Dorg.gradle.appname=gradlew -cp "$(dirname $0)/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"' >> gradlew
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1 || true
+          gradle wrapper --gradle-version=8.7
+          ./gradlew assembleDebug
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
