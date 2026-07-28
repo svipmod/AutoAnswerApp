@@ -271,7 +271,7 @@ private fun startAnswer(
         while (running) {
             try {
                 // 1. 截图
-                val bitmap = ScreenCaptureService.instance?.captureScreen()
+                val bitmap = ScreenCaptureService.getInstance()?.captureScreen()
                 if (bitmap == null) {
                     delay(1000)
                     continue

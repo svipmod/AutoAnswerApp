@@ -1,9 +1,14 @@
 package com.autoanswer.ocr
 
 import android.graphics.Bitmap
+import android.graphics.Rect
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+import kotlinx.coroutines.suspendCancellableCoroutine
+import com.google.android.gms.tasks.Task
+import kotlin.coroutines.resume
 
 class OcrEngine {
 
@@ -27,11 +32,9 @@ class OcrEngine {
     suspend fun recognize(bitmap: Bitmap): OcrResult {
         return try {
             val image = InputImage.fromBitmap(bitmap, 0)
-            val result = recognizer.process(image)
-            // 同步转协程
-            val text = result.text
-            val blocks = result.textBlocks.map { block ->
-                val box = block.boundingBox ?: return@map null
+            val text = recognizer.process(image).await()
+            val blocks = text.textBlocks.mapNotNull { block ->
+                val box = block.boundingBox ?: return@mapNotNull null
                 TextBlock(
                     text = block.text,
                     left = box.left.toFloat(),
@@ -39,20 +42,19 @@ class OcrEngine {
                     right = box.right.toFloat(),
                     bottom = box.bottom.toFloat()
                 )
-            }.filterNotNull()
-
-            OcrResult(text = text, blocks = blocks)
+            }
+            OcrResult(text = text.text, blocks = blocks)
         } catch (e: Exception) {
             OcrResult(text = "", blocks = emptyList())
         }
     }
 
-    /** 提取题目文本（智能过滤非题目内容） */
+    /** 提取题目文本 */
     fun extractQuestions(ocrResult: OcrResult): List<String> {
         val lines = ocrResult.text.split("\n")
             .map { it.trim() }
             .filter { it.isNotBlank() && it.length > 3 }
-            .filterNot { it.matches(Regex("^[A-E][.、．]?\\s*$")) } // 纯选项字母
+            .filterNot { it.matches(Regex("^[A-E][.、．]?\\s*$")) }
         return lines
     }
 
@@ -68,4 +70,10 @@ class OcrEngine {
         }
         return options
     }
+}
+
+/** 将 Task 转为可等待的 suspend 函数 */
+suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
+    addOnSuccessListener { result -> cont.resume(result) }
+    addOnFailureListener { e -> cont.resumeWithException(e) }
 }

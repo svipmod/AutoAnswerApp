@@ -45,7 +45,11 @@ class ScreenCaptureService : Service() {
         const val NOTIFICATION_ID = 1001
         const val CHANNEL_ID = "screen_capture_channel"
 
+        @JvmStatic
         private var instance: ScreenCaptureService? = null
+        
+        @JvmStatic
+        fun getInstance(): ScreenCaptureService? = instance
 
         fun start(context: Context, resultCode: Int, data: Intent) {
             val intent = Intent(context, ScreenCaptureService::class.java).apply {
