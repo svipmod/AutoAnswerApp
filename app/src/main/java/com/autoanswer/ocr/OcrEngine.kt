@@ -9,6 +9,7 @@ import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import com.google.android.gms.tasks.Task
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class OcrEngine {
 
