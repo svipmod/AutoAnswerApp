@@ -5,7 +5,6 @@ import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,7 +29,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainApp()
+                    MainApp(activity = this)
                 }
             }
         }
@@ -38,18 +37,17 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainApp() {
+fun MainApp(activity: ComponentActivity? = null) {
     val navController = rememberNavController()
     var captureGranted by remember { mutableStateOf(false) }
-    val activity = LocalActivity.current
 
     val captureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == ComponentActivity.RESULT_OK && result.data != null) {
             captureGranted = true
-            activity?.let { act ->
-                ScreenCaptureService.start(act, result.resultCode, result.data!!)
+            activity?.let {
+                ScreenCaptureService.start(it, result.resultCode, result.data!!)
             }
         }
     }
@@ -57,8 +55,7 @@ fun MainApp() {
     fun requestScreenCapture() {
         val manager = activity?.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
         if (manager != null) {
-            val intent = manager.createScreenCaptureIntent()
-            captureLauncher.launch(intent)
+            captureLauncher.launch(manager.createScreenCaptureIntent())
         }
     }
 
