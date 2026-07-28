@@ -5,9 +5,7 @@ import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,42 +19,51 @@ import com.autoanswer.ui.screens.*
 import com.autoanswer.ui.theme.AutoAnswerTheme
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        const val REQUEST_SCREEN_CAPTURE = 1001
+        var captureResult: Pair<Int, Intent?>? = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             AutoAnswerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainApp(activity = this)
+                    MainApp()
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun MainApp(activity: ComponentActivity? = null) {
-    val navController = rememberNavController()
-    var captureGranted by remember { mutableStateOf(false) }
-
-    val captureLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == ComponentActivity.RESULT_OK && result.data != null) {
-            captureGranted = true
-            activity?.let {
-                ScreenCaptureService.start(it, result.resultCode, result.data!!)
             }
         }
     }
 
     fun requestScreenCapture() {
-        val manager = activity?.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
-        if (manager != null) {
-            captureLauncher.launch(manager.createScreenCaptureIntent())
+        val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_SCREEN_CAPTURE)
+    }
+
+    @Deprecated("Use registerForActivityResult")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_SCREEN_CAPTURE && resultCode == RESULT_OK && data != null) {
+            captureResult = Pair(resultCode, data)
+            ScreenCaptureService.start(this, resultCode, data)
         }
+    }
+}
+
+@Composable
+fun MainApp() {
+    val navController = rememberNavController()
+    var captureGranted by remember { mutableStateOf(MainActivity.captureResult != null) }
+    val activity = androidx.compose.ui.platform.LocalContext.current as? MainActivity
+
+    // 监听 captureResult 变化
+    LaunchedEffect(MainActivity.captureResult) {
+        captureGranted = MainActivity.captureResult != null
     }
 
     NavHost(navController = navController, startDestination = "home") {
@@ -66,7 +73,7 @@ fun MainApp(activity: ComponentActivity? = null) {
                 onNavigateToAnswer = { navController.navigate("answer") },
                 onNavigateToLogs = { navController.navigate("logs") },
                 capturePermissionGranted = captureGranted,
-                onRequestCapturePermission = { requestScreenCapture() }
+                onRequestCapturePermission = { activity?.requestScreenCapture() }
             )
         }
         composable("settings") {
@@ -76,7 +83,7 @@ fun MainApp(activity: ComponentActivity? = null) {
             AnswerScreen(
                 onBack = { navController.popBackStack() },
                 capturePermissionGranted = captureGranted,
-                onRequestCapturePermission = { requestScreenCapture() }
+                onRequestCapturePermission = { activity?.requestScreenCapture() }
             )
         }
         composable("logs") {
