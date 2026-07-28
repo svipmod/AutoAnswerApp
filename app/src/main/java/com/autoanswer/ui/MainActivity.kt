@@ -61,7 +61,6 @@ fun MainApp() {
     var captureGranted by remember { mutableStateOf(MainActivity.captureResult != null) }
     val activity = androidx.compose.ui.platform.LocalContext.current as? MainActivity
 
-    // 监听 captureResult 变化
     LaunchedEffect(MainActivity.captureResult) {
         captureGranted = MainActivity.captureResult != null
     }
