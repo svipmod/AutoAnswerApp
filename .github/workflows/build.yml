@@ -15,12 +15,11 @@ jobs:
           distribution: temurin
       - name: Install SDK
         run: |
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" 2>&1 | tail -3
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1 || true
       - name: Build APK
         run: |
-          mkdir -p gradle/wrapper
-          cd app && gradle wrapper --gradle-version=8.2 && cd ..
-          ./gradlew assembleDebug --no-daemon 2>&1
+          gradle wrapper --gradle-version=8.2
+          ./gradlew assembleDebug --no-daemon
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
